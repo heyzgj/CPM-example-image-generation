@@ -5,8 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ART_STYLES, STYLE_CATEGORIES, type ArtStyle, type StyleCategory, searchStyles, getStylesByCategory, getFeaturedStyles } from '@/lib/styles/style-definitions';
-import { StyleCard } from './style-card';
-import { StyleModal } from './style-modal';
+import { StyleCard } from '@/components/styles/style-card';
+import { StyleModal } from '@/components/styles/style-modal';
 
 interface StyleGalleryProps {
   selectedStyle?: string;

@@ -64,8 +64,8 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="mt-12 text-center text-sm text-gray-500">
-            <p>Requires your own Gemini API key • Client-side processing • Your data stays private</p>
+          <div className="mt-12 flex justify-center">
+            <p className="text-sm text-gray-500 text-center">Requires your own Gemini API key • Client-side processing • Your data stays private</p>
           </div>
         </div>
       </div>

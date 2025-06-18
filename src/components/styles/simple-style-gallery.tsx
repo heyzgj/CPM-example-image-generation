@@ -85,16 +85,6 @@ export function SimpleStyleGallery({ selectedStyle, onStyleSelect, className = '
                     <span className="ml-1 text-yellow-500 text-xs">★</span>
                   )}
                 </h3>
-
-                {/* Selection indicator */}
-                {selectedStyle === style.id && (
-                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Selected
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
