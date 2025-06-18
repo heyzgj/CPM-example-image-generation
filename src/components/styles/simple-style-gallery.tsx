@@ -30,22 +30,22 @@ export function SimpleStyleGallery({ selectedStyle, onStyleSelect, className = '
   }, [activeFilter]);
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 text-sm">
         <Button
           variant={activeFilter === 'featured' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('featured')}
-          className="h-8"
+          className="h-9 px-3 text-xs font-medium"
         >
-          ⭐ Featured ({ART_STYLES.filter(s => s.featured).length})
+          Featured ({ART_STYLES.filter(s => s.featured).length})
         </Button>
         <Button
           variant={activeFilter === 'all' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('all')}
-          className="h-8"
+          className="h-9 px-3 text-xs font-medium"
         >
           All Styles ({ART_STYLES.length})
         </Button>
@@ -55,65 +55,62 @@ export function SimpleStyleGallery({ selectedStyle, onStyleSelect, className = '
             variant={activeFilter === key ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveFilter(key as StyleCategory)}
-            className="h-8"
+            className="h-9 px-3 text-xs font-medium truncate"
           >
-            {category.icon} {category.name}
+            {category.name}
           </Button>
         ))}
       </div>
 
-      {/* Style Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {/* Style Grid - Clean and Modern */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {filteredStyles.map((style) => (
           <Card 
             key={style.id}
-            className={`cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-105 ${
+            className={`cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] border-2 min-h-[80px] ${
               selectedStyle === style.id 
-                ? 'ring-2 ring-blue-500 shadow-lg scale-105' 
-                : ''
+                ? 'border-blue-500 bg-blue-50 shadow-lg scale-[1.02]' 
+                : 'border-gray-200 hover:border-gray-300'
             }`}
             onClick={() => onStyleSelect(style.id)}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className={`font-semibold text-sm ${
-                  selectedStyle === style.id ? 'text-blue-600' : 'text-gray-900'
-                }`}>
+            <CardContent className="p-3 h-full flex flex-col justify-center">
+              <div className="text-center space-y-2">
+                {/* Style Name */}
+                <h3 className={`font-medium text-xs leading-tight truncate max-w-full ${
+                  selectedStyle === style.id ? 'text-blue-700' : 'text-gray-900'
+                }`} title={style.name}>
                   {style.name}
+                  {style.featured && (
+                    <span className="ml-1 text-yellow-500 text-xs">★</span>
+                  )}
                 </h3>
-                {style.featured && (
-                  <span className="text-yellow-500 text-xs">⭐</span>
-                )}
-              </div>
-              
-              <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                {style.shortDescription}
-              </p>
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className="capitalize">{style.difficulty}</span>
-                <span className="capitalize">{style.processingTime}</span>
-              </div>
-
-              {/* Selection indicator */}
-              {selectedStyle === style.id && (
-                <div className="mt-2 text-center">
-                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                {/* Selection indicator */}
+                {selectedStyle === style.id && (
+                  <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     Selected
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="text-center text-sm text-gray-500">
-        Showing {filteredStyles.length} of {ART_STYLES.length} available styles
-      </div>
+      {/* Results count */}
+      {filteredStyles.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No styles found in this category</p>
+        </div>
+      ) : (
+        <div className="text-center text-xs text-gray-500">
+          {filteredStyles.length} style{filteredStyles.length !== 1 ? 's' : ''} available
+        </div>
+      )}
     </div>
   );
 } 

@@ -133,7 +133,7 @@ export function StyleGallery({ selectedStyle, onStyleSelect, className = '' }: S
             onClick={() => setActiveFilter('featured')}
             className="h-8"
           >
-            ⭐ Featured
+            Featured
           </Button>
           {Object.entries(STYLE_CATEGORIES).map(([key, category]) => (
             <Button
@@ -143,7 +143,7 @@ export function StyleGallery({ selectedStyle, onStyleSelect, className = '' }: S
               onClick={() => setActiveFilter(key as StyleCategory)}
               className="h-8"
             >
-              {category.icon} {category.name}
+              {category.name}
             </Button>
           ))}
         </div>

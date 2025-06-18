@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
-import { Navigation } from "@/components/layout/navigation";
+import dynamic from "next/dynamic";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -14,6 +14,9 @@ const geistMono = localFont({
   variable: "--font-geist-mono",
   weight: "100 900",
 });
+
+// Dynamically import Navigation to render only on the client and avoid hydration mismatches
+const ClientNavigation = dynamic(() => import("@/components/layout/navigation").then(m => m.Navigation), { ssr: false });
 
 export const metadata: Metadata = {
   title: "AI Image Style Transfer - Gemini 2.0",
@@ -52,17 +55,19 @@ export default function RootLayout({
         </a>
 
         <QueryProvider>
-          <div className="min-h-screen bg-background">
+          <div className="min-h-screen bg-background flex flex-col">
             {/* Header Navigation */}
-            <header role="banner">
-              <Navigation />
+            <header role="banner" className="bg-white border-b border-gray-200">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <ClientNavigation />
+              </div>
             </header>
 
             {/* Main Content */}
             <main 
               id="main-content" 
               role="main"
-              className="focus:outline-none"
+              className="focus:outline-none flex-1"
               tabIndex={-1}
             >
               {children}
@@ -73,9 +78,9 @@ export default function RootLayout({
               role="contentinfo" 
               className="mt-auto border-t border-gray-200 bg-gray-50"
             >
-              <div className="container mx-auto px-4 py-6">
-                <div className="text-center text-sm text-gray-600">
-                  <p>
+              <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div className="flex flex-col items-center justify-center text-center text-sm text-gray-600 space-y-2">
+                  <p className="text-center">
                     © 2024 AI Image Style Transfer. Powered by{" "}
                     <a 
                       href="https://gemini.google.com" 
@@ -86,7 +91,7 @@ export default function RootLayout({
                       Google Gemini 2.0 Flash
                     </a>
                   </p>
-                  <p className="mt-2">
+                  <p className="text-center">
                     <a 
                       href="#main-content" 
                       className="text-blue-600 hover:text-blue-800 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"

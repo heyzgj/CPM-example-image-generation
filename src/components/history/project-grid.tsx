@@ -20,7 +20,6 @@ const LoadingSkeleton = memo(() => (
       <div 
         key={i} 
         className="aspect-square bg-gray-100 rounded-lg animate-pulse"
-        style={{ animationDelay: `${i * 50}ms` }}
       />
     ))}
   </div>
@@ -28,36 +27,16 @@ const LoadingSkeleton = memo(() => (
 
 LoadingSkeleton.displayName = 'LoadingSkeleton';
 
-// Memoized empty state component
-const EmptyState = memo(({ 
-  searchQuery, 
-  styleFilter, 
-  favoritesOnly 
-}: { 
-  searchQuery: string; 
-  styleFilter: string; 
-  favoritesOnly: boolean; 
-}) => (
-  <div className="text-center py-12">
-    <div className="text-gray-500 mb-4">
-      {searchQuery || styleFilter || favoritesOnly 
-        ? 'No projects match your filters' 
-        : 'No projects saved yet'}
-    </div>
-    {!searchQuery && !styleFilter && !favoritesOnly && (
-      <p className="text-gray-400">
-        Transform your first image to start building your creative portfolio!
-      </p>
-    )}
-  </div>
-));
-
-EmptyState.displayName = 'EmptyState';
-
 // Memoized error state component
 const ErrorState = memo(({ error, onRetry }: { error: string; onRetry: () => void }) => (
   <div className="text-center py-12">
-    <div className="text-red-500 mb-4">⚠️ {error}</div>
+    <div className="text-red-500 mb-4">
+      <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+    </div>
+    <h3 className="text-lg font-medium text-gray-900 mb-2">Something went wrong</h3>
+    <p className="text-gray-600 mb-4">{error}</p>
     <Button onClick={onRetry} variant="outline">
       Try Again
     </Button>
@@ -66,172 +45,175 @@ const ErrorState = memo(({ error, onRetry }: { error: string; onRetry: () => voi
 
 ErrorState.displayName = 'ErrorState';
 
-// Intersection observer hook for infinite scrolling
-function useIntersectionObserver(
-  callback: () => void,
-  enabled: boolean = true
-) {
-  const observer = useRef<IntersectionObserver | null>(null);
-  const elementRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    observer.current = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          callback();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    const element = elementRef.current;
-    if (element) {
-      observer.current.observe(element);
-    }
-
-    return () => {
-      if (observer.current && element) {
-        observer.current.unobserve(element);
+// Memoized empty state component
+const EmptyState = memo(({ 
+  searchQuery, 
+  styleFilter 
+}: { 
+  searchQuery?: string; 
+  styleFilter?: string; 
+}) => (
+  <div className="text-center py-12">
+    <div className="text-gray-400 mb-4">
+      <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    </div>
+    <h3 className="text-lg font-medium text-gray-900 mb-2">
+      {searchQuery || styleFilter ? 'No projects found' : 'No projects yet'}
+    </h3>
+    <p className="text-gray-600 mb-6">
+      {searchQuery || styleFilter 
+        ? 'Try adjusting your search or filter criteria'
+        : "You haven't created any projects yet. Start by transforming your first image!"
       }
-    };
-  }, [callback, enabled]);
+    </p>
+    {!searchQuery && !styleFilter && (
+      <Button asChild>
+        <a href="/upload">Create Your First Project</a>
+      </Button>
+    )}
+  </div>
+));
 
-  return elementRef;
-}
-
-// Performance monitoring hook
-function usePerformanceMonitor() {
-  const metricsRef = useRef({
-    renderStart: 0,
-    renderEnd: 0,
-    itemCount: 0
-  });
-
-  const startRender = useCallback(() => {
-    metricsRef.current.renderStart = performance.now();
-  }, []);
-
-  const endRender = useCallback((itemCount: number) => {
-    metricsRef.current.renderEnd = performance.now();
-    metricsRef.current.itemCount = itemCount;
-    
-    if (process.env.NODE_ENV === 'development') {
-      const duration = metricsRef.current.renderEnd - metricsRef.current.renderStart;
-      console.log(`ProjectGrid render: ${duration.toFixed(2)}ms for ${itemCount} items`);
-    }
-  }, []);
-
-  return { startRender, endRender, metrics: metricsRef.current };
-}
+EmptyState.displayName = 'EmptyState';
 
 // Main component with performance optimizations
-export const ProjectGrid = memo(function ProjectGrid({ 
+export function ProjectGrid({ 
   searchQuery = '', 
   styleFilter = '', 
   favoritesOnly = false,
-  className = '' 
+  className = ''
 }: ProjectGridProps) {
+  // Ref to keep track of the latest projects array length without re-creating callbacks
+  const projectsRef = useRef<ProjectHistory[]>([]);
+
   const [projects, setProjects] = useState<ProjectHistory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  // Performance monitoring
-  const { startRender, endRender } = usePerformanceMonitor();
+  const projectStorage = getProjectStorage();
 
-  // Memoized project storage instance
-  const projectStorage = useMemo(() => getProjectStorage(), []);
+  // Ensure component is mounted before running effects
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Memoized filter object
+  // Keep projectsRef in sync with projects state
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  // Memoize the filter object to prevent unnecessary re-renders
   const filter = useMemo((): ProjectFilter => ({
-    ...(searchQuery && { search: searchQuery }),
-    ...(styleFilter && { style: styleFilter }),
-    ...(favoritesOnly && { favorited: true }),
+    search: searchQuery || undefined,
+    style: styleFilter || undefined,
+    favorited: favoritesOnly || undefined
   }), [searchQuery, styleFilter, favoritesOnly]);
 
-  // Optimized load projects function
-  const loadProjects = useCallback(async (reset: boolean = false) => {
+  // Stable loadProjects function that doesn't depend on projects.length
+  const loadProjects = useCallback(async (reset = false) => {
+    if (!mounted) return;
+
     try {
       if (reset) {
         setLoading(true);
-        setProjects([]);
-        startRender();
+        setError(null);
+      } else {
+        setLoadingMore(true);
       }
 
-      const offset = reset ? 0 : projects.length;
-      const result = await projectStorage.searchProjects(filter, 20, offset);
+      // Use projectsRef.current.length instead of projects.length to avoid dependency
+      const offset = reset ? 0 : projectsRef.current.length;
+      const limit = 12;
+
+      const result = await Promise.race([
+        projectStorage.searchProjects(filter, limit, offset),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Search timeout after 10 seconds')), 10000)
+        )
+      ]);
 
       if (result.success && result.data) {
-        const newProjects = reset 
-          ? result.data.projects 
-          : [...projects, ...result.data.projects];
+        const newProjects = reset
+          ? result.data.projects
+          : [...projectsRef.current, ...result.data.projects];
 
+        // update state & mutable ref in one place
         setProjects(newProjects);
+        projectsRef.current = newProjects;
         setHasMore(result.data.hasMore);
-        setError(null);
-        
-        if (reset) {
-          endRender(result.data.projects.length);
-        }
       } else {
         setError(result.error || 'Failed to load projects');
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
-      console.error('Project loading error:', err);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      if (error instanceof Error && error.message.includes('timeout')) {
+        setError('Loading took too long. Please try again.');
+      } else {
+        setError('Failed to load projects. Please try again.');
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [projectStorage, filter, projects, startRender, endRender]);
+  }, [mounted, filter, projectStorage]);
 
-  // Optimized load more function
-  const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
-    
-    setLoadingMore(true);
-    await loadProjects(false);
-  }, [hasMore, loadingMore, loadProjects]);
-
-  // Optimized delete handler
-  const handleDeleteProject = useCallback(async (id: string) => {
-    const result = await projectStorage.deleteProject(id);
-    
-    if (result.success) {
-      setProjects(prev => prev.filter(p => p.id !== id));
-    } else {
-      setError(result.error || 'Failed to delete project');
-    }
-  }, [projectStorage]);
-
-  // Optimized favorite toggle handler
-  const handleToggleFavorite = useCallback(async (id: string) => {
-    const result = await projectStorage.toggleFavorite(id);
-    
-    if (result.success) {
-      setProjects(prev => prev.map(p => 
-        p.id === id 
-          ? { ...p, metadata: { ...p.metadata, favorited: !p.metadata.favorited } }
-          : p
-      ));
-    } else {
-      setError(result.error || 'Failed to update favorite');
-    }
-  }, [projectStorage]);
-
-  // Intersection observer for infinite scroll
-  const loadMoreRef = useIntersectionObserver(loadMore, hasMore && !loadingMore);
-
-  // Load projects when filters change
+  // Load projects when component mounts or filters change
   useEffect(() => {
-    loadProjects(true);
-  }, [filter, loadProjects]); // Use memoized filter
+    if (!mounted) return;
+    
+    // Use a small delay to prevent rapid re-renders
+    const timeoutId = setTimeout(() => {
+      loadProjects(true);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [mounted, loadProjects]);
+
+  // Load more function for manual loading
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      loadProjects(false);
+    }
+  }, [loadProjects, loadingMore, hasMore]);
+
+  // Handle project actions
+  const handleToggleFavorite = useCallback(async (projectId: string) => {
+    try {
+      const result = await projectStorage.toggleFavorite(projectId);
+      if (result.success) {
+        setProjects(prev => prev.map(project => 
+          project.id === projectId 
+            ? { ...project, metadata: { ...project.metadata, favorited: !project.metadata.favorited } }
+            : project
+        ));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  }, [projectStorage]);
+
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    try {
+      const result = await projectStorage.deleteProject(projectId);
+      if (result.success) {
+        setProjects(prev => prev.filter(project => project.id !== projectId));
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    }
+  }, [projectStorage]);
 
   // Memoized grid content
   const gridContent = useMemo(() => {
+    if (!mounted) {
+      return <LoadingSkeleton />;
+    }
+    
     if (loading) {
       return <LoadingSkeleton />;
     }
@@ -244,95 +226,64 @@ export const ProjectGrid = memo(function ProjectGrid({
       return <EmptyState 
         searchQuery={searchQuery} 
         styleFilter={styleFilter} 
-        favoritesOnly={favoritesOnly} 
       />;
     }
 
     return (
-      <>
-        {/* Results summary */}
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
-            {searchQuery && ` matching "${searchQuery}"`}
-            {styleFilter && ` in ${styleFilter} style`}
-            {favoritesOnly && ' in favorites'}
-          </span>
-        </div>
-
-        {/* Optimized project grid with CSS Grid */}
-        <div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          style={{
-            // CSS Grid optimization for better performance
-            contentVisibility: 'auto',
-            containIntrinsicSize: '300px',
-          }}
-        >
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {projects.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
-              onDelete={() => handleDeleteProject(project.id)}
               onToggleFavorite={() => handleToggleFavorite(project.id)}
+              onDelete={() => handleDeleteProject(project.id)}
             />
           ))}
         </div>
 
-        {/* Infinite scroll trigger */}
+        {/* Manual Load More Button (intersection observer disabled) */}
         {hasMore && (
-          <div 
-            ref={loadMoreRef}
-            className="text-center pt-6 min-h-[100px] flex items-center justify-center"
-          >
-            {loadingMore ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
-                <span>Loading more projects...</span>
-              </div>
-            ) : (
-              <Button 
-                onClick={loadMore} 
-                variant="outline"
-                className="min-w-32"
-              >
-                Load More
-              </Button>
-            )}
+          <div className="text-center pt-6">
+            <Button 
+              onClick={loadMore}
+              disabled={loadingMore}
+              variant="outline"
+              size="lg"
+            >
+              {loadingMore ? (
+                <span className="flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                  Loading more...
+                </span>
+              ) : (
+                'Load More Projects'
+              )}
+            </Button>
           </div>
         )}
-
-        {/* Performance info for development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="text-xs text-gray-400 border-t pt-4">
-            Loaded {projects.length} projects
-            {hasMore && ' • More available'}
-            • Optimized rendering enabled
-          </div>
-        )}
-      </>
+      </div>
     );
   }, [
-    loading, 
-    error, 
-    projects, 
-    searchQuery, 
-    styleFilter, 
-    favoritesOnly, 
-    hasMore, 
+    mounted,
+    loading,
+    error,
+    projects,
+    searchQuery,
+    styleFilter,
+    hasMore,
     loadingMore,
-    handleDeleteProject,
-    handleToggleFavorite,
-    loadMore,
     loadProjects,
-    loadMoreRef
+    loadMore,
+    handleToggleFavorite,
+    handleDeleteProject
   ]);
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={className}>
       {gridContent}
     </div>
   );
-});
+}
 
 ProjectGrid.displayName = 'ProjectGrid'; 

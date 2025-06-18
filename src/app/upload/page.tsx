@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageModal } from '@/components/ui/modal';
 import { validateFile } from '@/lib/file-utils';
 import { geminiService } from '@/lib/gemini-service';
 import { ImageTransformationResult } from '@/lib/gemini-client';
@@ -31,6 +32,7 @@ export default function UploadPage() {
   const [isServiceReady, setIsServiceReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
+  const [modalImage, setModalImage] = useState<{ src: string; alt: string; title: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const projectStorage = getProjectStorage();
@@ -50,8 +52,6 @@ export default function UploadPage() {
 
     initializeService();
   }, []);
-
-  // Legacy styles removed - now using comprehensive style definitions from StyleGallery
 
   const handleFileValidation = useCallback((file: File): string | null => {
     const validation = validateFile(file);
@@ -152,6 +152,7 @@ export default function UploadPage() {
     }
     setUploadedImage(null);
     setError(null);
+    setTransformedResult(null); // Clear results when removing image
   }, [uploadedImage?.previewUrl]);
 
   const handleStyleSelect = useCallback((style: string) => {
@@ -199,68 +200,58 @@ export default function UploadPage() {
         });
       }
     } catch (error) {
-      // Track transformation error with timing
-      const transformDuration = trackImageTransform(transformStartTime);
       console.error('Transformation error:', error);
       setError('Failed to transform image. Please try again.');
-      trackCustomMetric('transformation_exception', transformDuration, {
-        error: String(error),
-        style: selectedStyle
+      trackCustomMetric('transformation_exception', Date.now() - transformStartTime, {
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
       setIsTransforming(false);
     }
   }, [uploadedImage, selectedStyle, isServiceReady, startImageTransform, trackImageTransform, trackCustomMetric]);
 
-  const handleSaveProject = useCallback(async () => {
-    if (!uploadedImage || !selectedStyle || !transformedResult?.transformedImage) {
-      setError('Missing required data to save project');
-      return;
-    }
+  const saveToHistory = useCallback(async () => {
+    if (!uploadedImage || !transformedResult || !selectedStyle || !transformedResult.transformedImage) return;
 
     setIsSaving(true);
-    setError(null);
-    setSavedSuccessfully(false);
-
     try {
+      const styleDefinition = getStyleById(selectedStyle);
+      
       // Convert transformed image data URL to blob
       const response = await fetch(transformedResult.transformedImage);
       const transformedBlob = await response.blob();
-
-      // Get style information
-      const styleInfo = getStyleById(selectedStyle);
       
-      // Create save request
       const saveRequest: SaveProjectRequest = {
+        title: `${styleDefinition?.name || selectedStyle} - ${uploadedImage.name}`,
         originalImage: uploadedImage.file,
         transformedImage: transformedBlob,
         style: {
-          name: styleInfo?.name || selectedStyle,
-          parameters: styleInfo?.parameters.reduce((acc, param) => ({
+          name: styleDefinition?.name || selectedStyle,
+          parameters: styleDefinition?.parameters?.reduce((acc, param) => ({
             ...acc,
             [param.name]: param.default
-          }), {}) || {},
+          }), {}) || {}
         },
-        transformationTime: 3000, // Default 3 seconds - we'll track this properly later
-        tags: styleInfo?.category ? [styleInfo.category] : [],
+        transformationTime: 3000, // Default transformation time
+        tags: styleDefinition?.category ? [styleDefinition.category] : []
       };
 
       const result = await projectStorage.saveProject(saveRequest);
-
       if (result.success) {
         setSavedSuccessfully(true);
-        // Auto-hide success message after 3 seconds
         setTimeout(() => setSavedSuccessfully(false), 3000);
       } else {
-        setError(result.error || 'Failed to save project');
+        setError(result.error || 'Failed to save to history');
       }
     } catch (error) {
-      console.error('Save project error:', error);
-      setError('Failed to save project. Please try again.');
+      console.error('Save error:', error);
+      setError('Failed to save to history');
     } finally {
       setIsSaving(false);
     }
-  }, [uploadedImage, selectedStyle, transformedResult, projectStorage]);
+  }, [uploadedImage, transformedResult, selectedStyle, projectStorage]);
+
+  const canTransform = uploadedImage && selectedStyle && isServiceReady && !isTransforming;
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -270,372 +261,378 @@ export default function UploadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const canTransform = uploadedImage && selectedStyle && !isUploading && !isTransforming && isServiceReady;
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Transform Your Image
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Container with proper max-width and centering */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header Section */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl mb-6">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            AI Image Transformer
           </h1>
-          <p className="text-gray-600">
-            Upload an image and choose an artistic style to create your masterpiece
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Transform your images with the power of AI. Upload any photo and apply stunning artistic styles in seconds.
           </p>
         </div>
 
+        {/* Error Alert */}
         {error && (
-          <div 
-            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
-            role="alert"
-            aria-live="polite"
-          >
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <svg 
-                  className="h-5 w-5 text-red-400" 
-                  viewBox="0 0 20 20" 
-                  fill="currentColor"
-                  aria-hidden="true"
+          <div className="mb-8 max-w-4xl mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Something went wrong</h3>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-auto flex-shrink-0 text-red-400 hover:text-red-600"
                 >
-                  <path 
-                    fillRule="evenodd" 
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" 
-                    clipRule="evenodd" 
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
-                  Error
-                </h3>
-                <p className="text-sm text-red-700 mt-1">
-                  {error}
-                </p>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Upload Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>1. Upload Image</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!uploadedImage ? (
-                <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-                    isDragging
-                      ? 'border-blue-400 bg-blue-50'
-                      : isUploading
-                      ? 'border-gray-300 bg-gray-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={handleClick}
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Upload image by clicking or dragging"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleClick();
-                    }
-                  }}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    onChange={handleFileInput}
-                    className="hidden"
-                    aria-label="File input"
-                  />
-                  
-                  {isUploading ? (
-                    <div>
-                      <div className="w-12 h-12 mx-auto mb-4" aria-hidden="true">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                      </div>
-                      <p className="text-gray-600 mb-2" aria-live="polite">Uploading...</p>
-                      <div 
-                        className="w-full bg-gray-200 rounded-full h-2 mb-2"
-                        role="progressbar"
-                        aria-valuenow={uploadProgress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Upload progress: ${uploadProgress}%`}
-                      >
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-sm text-gray-500" aria-live="polite">
-                        {uploadProgress}% complete
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="mb-4">
-                        <svg
-                          className="w-12 h-12 text-gray-400 mx-auto"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.4M15 13l-3-3m0 0l-3 3m3-3v12"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-gray-600 mb-2">
-                        {isDragging 
-                          ? 'Drop your image here'
-                          : 'Drag and drop your image here, or click to browse'
-                        }
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Supports JPEG, PNG up to 10MB
-                      </p>
-                    </div>
-                  )}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
+          
+          {/* Left Column - Controls */}
+          <div className="lg:col-span-5 space-y-8">
+            
+            {/* Step 1: Upload Image */}
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-sm">1</span>
+                  </div>
+                  <CardTitle className="text-xl text-gray-900">Upload Your Image</CardTitle>
                 </div>
-              ) : (
-                                  <div className="space-y-4">
-                    <div className="relative">
+              </CardHeader>
+              <CardContent>
+                {!uploadedImage ? (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
+                      isDragging
+                        ? 'border-blue-400 bg-blue-50 scale-[1.02]'
+                        : isUploading
+                        ? 'border-gray-300 bg-gray-50'
+                        : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={handleClick}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleClick();
+                      }
+                    }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      onChange={handleFileInput}
+                      className="hidden"
+                    />
+                    
+                    {isUploading ? (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 mx-auto">
+                          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+                        </div>
+                        <div>
+                          <p className="text-gray-700 font-medium mb-3">Uploading your image...</p>
+                          <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                            <div 
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-gray-500">{uploadProgress}% complete</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 mx-auto bg-blue-100 rounded-2xl flex items-center justify-center">
+                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.4M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-gray-700 font-medium mb-2">
+                            {isDragging ? 'Drop your image here!' : 'Drag & drop your image here'}
+                          </p>
+                          <p className="text-gray-500 text-sm mb-4">or click to browse your files</p>
+                          <div className="inline-flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            JPEG, PNG up to 10MB
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative group">
                       <Image
                         src={uploadedImage.previewUrl}
                         alt="Uploaded preview"
                         width={400}
-                        height={256}
-                        className="w-full h-64 object-cover rounded-lg"
+                        height={300}
+                        className="w-full h-auto max-h-64 object-contain rounded-xl cursor-pointer transition-transform group-hover:scale-[1.02]"
                         unoptimized
+                        onClick={() => setModalImage({
+                          src: uploadedImage.previewUrl,
+                          alt: 'Uploaded image (full size)',
+                          title: uploadedImage.name
+                        })}
                       />
                       <button
                         onClick={handleRemoveImage}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 transition-colors"
+                        className="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-lg"
                         aria-label="Remove image"
                       >
-                        ×
-                      </button>
-                    </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="font-medium text-gray-900 text-sm">
-                      {uploadedImage.name}
-                    </p>
-                    <p className="text-gray-500 text-xs">
-                      {formatFileSize(uploadedImage.size)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Clear current image first, then trigger file input
-                      handleRemoveImage();
-                      setTimeout(() => {
-                        fileInputRef.current?.click();
-                      }, 100);
-                    }}
-                    className="w-full py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    Upload Different Image
-                  </button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Enhanced Style Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>2. Choose Style</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SimpleStyleGallery
-                selectedStyle={selectedStyle}
-                onStyleSelect={handleStyleSelect}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Transform Button */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={handleTransformImage}
-            disabled={!canTransform}
-            className={`px-8 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              canTransform
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-            aria-describedby="transform-status"
-            aria-disabled={!canTransform}
-          >
-            {isTransforming ? (
-              <span className="flex items-center gap-2 justify-center">
-                <div 
-                  className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"
-                  aria-hidden="true"
-                ></div>
-                Transforming...
-              </span>
-            ) : (
-              'Transform Image'
-            )}
-          </button>
-          <p 
-            id="transform-status" 
-            className="text-sm text-gray-500 mt-2"
-            aria-live="polite"
-          >
-            {isTransforming
-              ? 'AI is working its magic...'
-              : uploadedImage && selectedStyle
-              ? 'Ready to transform!'
-              : 'Upload an image and select a style to continue'
-            }
-          </p>
-        </div>
-
-        {/* Transformation Result */}
-        {transformedResult && transformedResult.transformedImage && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>✨ Transformed Result</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Original Image */}
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-3">Original</h3>
-                    <Image
-                      src={uploadedImage?.previewUrl || ''}
-                      alt="Original image"
-                      width={400}
-                      height={256}
-                      className="w-full h-64 object-cover rounded-lg border"
-                      unoptimized
-                    />
-                  </div>
-
-                  {/* Transformed Image */}
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-3">
-                      {getStyleById(selectedStyle)?.name || selectedStyle} Style
-                    </h3>
-                    <Image
-                      src={transformedResult.transformedImage}
-                      alt="Transformed image"
-                      width={400}
-                      height={256}
-                      className="w-full h-64 object-cover rounded-lg border"
-                      unoptimized
-                    />
-                  </div>
-                </div>
-
-                {/* Generated Text */}
-                {transformedResult.generatedText && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">AI Description:</h4>
-                    <p className="text-gray-700 text-sm">{transformedResult.generatedText}</p>
-                  </div>
-                )}
-
-                {/* Usage Stats */}
-                {transformedResult.usage && (
-                  <div className="mt-4 text-xs text-gray-500">
-                    Tokens used: {transformedResult.usage.totalTokens} 
-                    (Input: {transformedResult.usage.promptTokens}, Output: {transformedResult.usage.completionTokens})
-                  </div>
-                )}
-
-                {/* Success Message */}
-                {savedSuccessfully && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-medium">Project saved successfully!</span>
-                    </div>
-                    <p className="text-green-600 text-sm mt-1">
-                      You can view it in your <a href="/history" className="underline hover:text-green-800">project history</a>.
-                    </p>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="mt-4 flex gap-3 justify-center">
-                  <button
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = transformedResult.transformedImage!;
-                      link.download = `transformed_${selectedStyle}_${uploadedImage?.name || 'image'}.png`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Download
-                  </button>
-                  
-                  <button
-                    onClick={handleSaveProject}
-                    disabled={isSaving || savedSuccessfully}
-                    className={`px-6 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                      savedSuccessfully
-                        ? 'bg-green-100 text-green-800 cursor-default'
-                        : isSaving
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                        Saving...
-                      </>
-                    ) : savedSuccessfully ? (
-                      <>
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        Saved!
-                      </>
-                    ) : (
-                      <>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        Save Project
-                      </>
-                    )}
-                  </button>
-                </div>
-                
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  Save your project to build your creative portfolio and easily find it later!
-                </p>
+                      </button>
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1">
+                          <span className="text-sm font-medium text-gray-900">Click to view full size</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm truncate max-w-48">{uploadedImage.name}</p>
+                          <p className="text-gray-500 text-xs">{formatFileSize(uploadedImage.size)}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            handleRemoveImage();
+                            setTimeout(() => fileInputRef.current?.click(), 100);
+                          }}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Step 2: Choose Style */}
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                    <span className="text-indigo-600 font-semibold text-sm">2</span>
+                  </div>
+                  <CardTitle className="text-xl text-gray-900">Choose Your Style</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SimpleStyleGallery
+                  selectedStyle={selectedStyle}
+                  onStyleSelect={handleStyleSelect}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Transform Button */}
+            <div className="sticky bottom-6 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border">
+              <button
+                onClick={handleTransformImage}
+                disabled={!canTransform}
+                className={`w-full px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 ${
+                  canTransform
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isTransforming ? (
+                  <span className="flex items-center gap-3 justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                    Transforming Magic...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 justify-center">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    Transform Image
+                  </span>
+                )}
+              </button>
+              
+              <div className="mt-3 text-center">
+                {isTransforming ? (
+                  <p className="text-sm text-gray-600">Our AI is creating your masterpiece...</p>
+                ) : uploadedImage && selectedStyle ? (
+                  <p className="text-sm text-green-600 font-medium">✓ Ready to transform!</p>
+                ) : (
+                  <p className="text-sm text-gray-500">Upload an image and select a style to continue</p>
+                )}
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* Right Column - Results */}
+          <div className="lg:col-span-7">
+            <div className="sticky top-8">
+              {!transformedResult || !transformedResult.transformedImage ? (
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm h-96">
+                  <CardContent className="h-full flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gray-100 rounded-2xl flex items-center justify-center">
+                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Your transformed image will appear here</h3>
+                        <p className="text-gray-500">Upload an image and select a style to see the magic happen!</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <CardTitle className="text-xl text-gray-900">✨ Transformed Result</CardTitle>
+                      </div>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        AI Generated
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="relative group">
+                      <Image
+                        src={transformedResult.transformedImage}
+                        alt="AI transformed result"
+                        width={600}
+                        height={400}
+                        className="w-full h-auto max-h-96 object-contain rounded-xl cursor-pointer transition-transform group-hover:scale-[1.02]"
+                        unoptimized
+                        onClick={() => transformedResult.transformedImage && setModalImage({
+                          src: transformedResult.transformedImage,
+                          alt: 'Transformed image (full size)',
+                          title: `Transformed with ${getStyleById(selectedStyle)?.name || selectedStyle}`
+                        })}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1">
+                          <span className="text-sm font-medium text-gray-900">Click to view full size</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={saveToHistory}
+                        disabled={isSaving}
+                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-green-500/20"
+                      >
+                        {isSaving ? (
+                          <span className="flex items-center gap-2 justify-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                            Saving...
+                          </span>
+                        ) : savedSuccessfully ? (
+                          <span className="flex items-center gap-2 justify-center">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Saved!
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 justify-center">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save to History
+                          </span>
+                        )}
+                      </button>
+
+                      <a
+                        href={transformedResult.transformedImage}
+                        download={`transformed_${uploadedImage?.name || 'image'}`}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </a>
+                    </div>
+
+                    {savedSuccessfully && (
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-green-800">Successfully saved!</p>
+                            <p className="text-sm text-green-600">Your transformed image has been added to your history.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Image Modal */}
+      {modalImage && (
+        <ImageModal
+          isOpen={!!modalImage}
+          src={modalImage.src}
+          alt={modalImage.alt}
+          title={modalImage.title}
+          onClose={() => setModalImage(null)}
+        />
+      )}
     </div>
   );
 } 

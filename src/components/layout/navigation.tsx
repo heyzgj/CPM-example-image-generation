@@ -10,10 +10,18 @@ import { Menu, X } from 'lucide-react';
 export function Navigation() {
   const [projectCount, setProjectCount] = useState<number>(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const projectStorage = getProjectStorage();
 
+  // Ensure component is mounted before rendering dynamic content
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
     const loadProjectCount = async () => {
       try {
         const result = await projectStorage.getStorageStats();
@@ -26,7 +34,7 @@ export function Navigation() {
     };
 
     loadProjectCount();
-  }, [projectStorage]);
+  }, [projectStorage, mounted]);
 
   // Close mobile menu when pathname changes
   useEffect(() => {
@@ -61,7 +69,7 @@ export function Navigation() {
       href: '/history', 
       label: 'History', 
       description: 'View your creative projects',
-      badge: projectCount > 0 ? (projectCount > 99 ? '99+' : projectCount.toString()) : undefined
+      badge: mounted && projectCount > 0 ? (projectCount > 99 ? '99+' : projectCount.toString()) : undefined
     },
     { href: '/settings', label: 'Settings', description: 'Manage your API keys' },
   ];
@@ -71,15 +79,91 @@ export function Navigation() {
     return pathname.startsWith(href);
   };
 
+  // Don't render dynamic content until mounted
+  if (!mounted) {
+    return (
+      <nav 
+        className="sticky top-0 z-40"
+        role="navigation"
+        aria-label="Main navigation"
+        id="navigation"
+      >
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <Link 
+            href="/" 
+            className="flex items-center space-x-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            aria-label="StyleGenie - AI Image Style Transfer, go to homepage"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+              <span className="text-sm font-bold text-white" aria-hidden="true">AI</span>
+            </div>
+            <span className="text-xl font-bold text-gray-900">StyleGenie</span>
+          </Link>
+
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex items-center space-x-8" role="menubar">
+            <Link
+              href="/upload"
+              className="font-medium transition-colors rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              role="menuitem"
+            >
+              Upload
+            </Link>
+            <Link
+              href="/history"
+              className="font-medium transition-colors rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              role="menuitem"
+            >
+              History
+            </Link>
+            <Link
+              href="/settings"
+              className="font-medium transition-colors rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+              role="menuitem"
+            >
+              Settings
+            </Link>
+          </div>
+
+          {/* Desktop CTA Button */}
+          <div className="hidden md:flex items-center space-x-4">
+            <Link href="/upload">
+              <Button 
+                size="sm"
+                className="focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Create Now
+              </Button>
+            </Link>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              aria-controls="mobile-menu"
+              aria-expanded={false}
+              aria-label="Open main menu"
+            >
+              <span className="sr-only">Open main menu</span>
+              <Menu className="block h-6 w-6" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav 
-      className="border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-40"
+      className="sticky top-0 z-40"
       role="navigation"
       aria-label="Main navigation"
       id="navigation"
     >
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+      <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link 
             href="/" 
@@ -153,7 +237,6 @@ export function Navigation() {
             </button>
           </div>
         </div>
-      </div>
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
@@ -209,8 +292,8 @@ export function Navigation() {
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <div>
-                    <div>{item.label}</div>
-                    <div className="text-sm text-gray-500 mt-1">{item.description}</div>
+                    <div className="font-medium">{item.label}</div>
+                    <div className="text-sm text-gray-500">{item.description}</div>
                   </div>
                   {item.badge && (
                     <span 
@@ -225,11 +308,10 @@ export function Navigation() {
             </div>
 
             {/* Mobile CTA */}
-            <div className="p-4 border-t border-gray-200">
-              <Link href="/upload" className="block">
+            <div className="border-t border-gray-200 p-4">
+              <Link href="/upload" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button 
                   className="w-full focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Create Now
                 </Button>

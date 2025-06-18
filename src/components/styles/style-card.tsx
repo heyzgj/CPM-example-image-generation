@@ -72,7 +72,7 @@ export function StyleCard({ style, isSelected, onClick, onInfoClick }: StyleCard
             <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
               {style.featured && (
                 <Badge variant="default" className="text-xs bg-yellow-500 text-white">
-                  ⭐ Featured
+                  Featured
                 </Badge>
               )}
               <Badge variant="secondary" className="text-xs bg-white/20 text-white backdrop-blur-sm">
