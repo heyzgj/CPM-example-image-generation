@@ -1,3 +1,5 @@
+import type { StyleType } from "./schemas";
+
 // API Endpoints
 export const API_ENDPOINTS = {
   GEMINI_BASE: 'https://generativelanguage.googleapis.com/v1beta',
@@ -7,13 +9,6 @@ export const API_ENDPOINTS = {
     GEMINI_2_FLASH_LITE: 'gemini-2.0-flash-lite',
   }
 } as const;
-
-// Style type definition
-interface StyleType {
-  id: string;
-  name: string;
-  thumbnailUrl: string;
-}
 
 // Art style presets available in the app
 export const STYLE_PRESETS: StyleType[] = [
