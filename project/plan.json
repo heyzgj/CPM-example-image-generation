@@ -1,0 +1,213 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "Gemini 2.0 Flash Image Generation App - Project Plan"
+  },
+  "vertices": [
+    {
+      "id": "T001",
+      "type": "task",
+      "title": "Core Infrastructure Setup",
+      "description": "Set up basic app architecture, routing, and core dependencies",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [],
+      "epic": "foundation"
+    },
+    {
+      "id": "T002", 
+      "type": "task",
+      "title": "API Key Management System",
+      "description": "Implement secure client-side API key storage and validation",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": ["T001"],
+      "epic": "auth"
+    },
+    {
+      "id": "T003",
+      "type": "task", 
+      "title": "Style Library & Components",
+      "description": "Create preset art styles library and style selection components",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T001"],
+      "epic": "styles"
+    },
+    {
+      "id": "T004",
+      "type": "task",
+      "title": "Image Upload System",
+      "description": "Implement drag-and-drop image upload with validation",
+      "status": "todo", 
+      "priority": "high",
+      "dependencies": ["T001"],
+      "epic": "upload"
+    },
+    {
+      "id": "T005",
+      "type": "task",
+      "title": "Gemini API Integration",
+      "description": "Integrate with Gemini 2.0 Flash Preview image generation API",
+      "status": "todo",
+      "priority": "critical",
+      "dependencies": ["T002", "T004"],
+      "epic": "api"
+    },
+    {
+      "id": "T006",
+      "type": "task",
+      "title": "Transformation Processing UI",
+      "description": "Create loading states, progress indicators, and error handling",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T005"],
+      "epic": "ui"
+    },
+    {
+      "id": "T007",
+      "type": "task",
+      "title": "Preview & Download System",
+      "description": "Implement before/after comparison and download functionality",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T005"],
+      "epic": "results"
+    },
+    {
+      "id": "T008",
+      "type": "task",
+      "title": "Project History Storage",
+      "description": "Implement IndexedDB storage for transformation history",
+      "status": "todo",
+      "priority": "low",
+      "dependencies": ["T007"],
+      "epic": "storage"
+    },
+    {
+      "id": "T009",
+      "type": "task",
+      "title": "Responsive Design & Accessibility",
+      "description": "Ensure WCAG 2.1 AA compliance and mobile responsiveness",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T006", "T007"],
+      "epic": "accessibility"
+    },
+    {
+      "id": "T010",
+      "type": "task",
+      "title": "Performance Optimization",
+      "description": "Optimize for <5s transformation target and 100 concurrent users",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T005", "T006"],
+      "epic": "performance"
+    },
+    {
+      "id": "T011",
+      "type": "task",
+      "title": "Testing Suite",
+      "description": "Implement unit, integration, and E2E tests for all components",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": ["T001", "T002", "T004", "T005"],
+      "epic": "testing"
+    },
+    {
+      "id": "T012",
+      "type": "task",
+      "title": "Deployment & CI/CD",
+      "description": "Set up Vercel deployment pipeline and monitoring",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": ["T011"],
+      "epic": "deployment"
+    }
+  ],
+  "edges": [
+    {"from": "T001", "to": "T002", "type": "dependency"},
+    {"from": "T001", "to": "T003", "type": "dependency"},
+    {"from": "T001", "to": "T004", "type": "dependency"},
+    {"from": "T002", "to": "T005", "type": "dependency"},
+    {"from": "T004", "to": "T005", "type": "dependency"},
+    {"from": "T005", "to": "T006", "type": "dependency"},
+    {"from": "T005", "to": "T007", "type": "dependency"},
+    {"from": "T007", "to": "T008", "type": "dependency"},
+    {"from": "T006", "to": "T009", "type": "dependency"},
+    {"from": "T007", "to": "T009", "type": "dependency"},
+    {"from": "T005", "to": "T010", "type": "dependency"},
+    {"from": "T006", "to": "T010", "type": "dependency"},
+    {"from": "T001", "to": "T011", "type": "dependency"},
+    {"from": "T002", "to": "T011", "type": "dependency"},
+    {"from": "T004", "to": "T011", "type": "dependency"},
+    {"from": "T005", "to": "T011", "type": "dependency"},
+    {"from": "T011", "to": "T012", "type": "dependency"}
+  ],
+  "criteria": {
+    "definition_of_done": [
+      "All tests pass (unit, integration, E2E)",
+      "Code coverage >= 70%",
+      "WCAG 2.1 AA compliance verified",
+      "Performance targets met (<5s transformation)",
+      "Security review completed",
+      "Documentation updated"
+    ],
+    "acceptance_criteria": {
+      "performance": "Average transformation time < 5 seconds",
+      "accessibility": "WCAG 2.1 Level AA compliance",
+      "security": "Client-side API key encryption",
+      "scalability": "Support 100+ concurrent users"
+    }
+  },
+  "epics": {
+    "foundation": {
+      "title": "Core Foundation",
+      "description": "Basic app setup and architecture"
+    },
+    "auth": {
+      "title": "Authentication & Security", 
+      "description": "API key management and security"
+    },
+    "styles": {
+      "title": "Style Management",
+      "description": "Art style library and selection"
+    },
+    "upload": {
+      "title": "Image Upload",
+      "description": "File upload and validation"
+    },
+    "api": {
+      "title": "API Integration",
+      "description": "Gemini API integration"
+    },
+    "ui": {
+      "title": "User Interface",
+      "description": "Loading states and interactions"
+    },
+    "results": {
+      "title": "Results & Download",
+      "description": "Preview and download functionality"
+    },
+    "storage": {
+      "title": "Data Storage",
+      "description": "Local storage and history"
+    },
+    "accessibility": {
+      "title": "Accessibility",
+      "description": "WCAG compliance and responsive design"
+    },
+    "performance": {
+      "title": "Performance",
+      "description": "Speed and scalability optimization"
+    },
+    "testing": {
+      "title": "Testing",
+      "description": "Comprehensive test coverage"
+    },
+    "deployment": {
+      "title": "Deployment",
+      "description": "CI/CD and monitoring"
+    }
+  }
+} 

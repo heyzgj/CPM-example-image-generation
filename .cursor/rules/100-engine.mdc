@@ -37,6 +37,12 @@ If scaffold fails, roll back directory and prompt the user.
 7. **Planner → JSON graph** – if PRD > 5000 tokens *or* tag `planner: advanced`,
    ask the model to output a Graph-of-Thoughts JSON (`vertices`, `edges`,
    `criteria`).  Save as `/project/plan.json` and create a task for each leaf.
+7.1 **Validate leaf-count** – If the graph has fewer than 3 tasks, pause and ask
+    the user for more granular acceptance criteria.  Do NOT continue with a
+    single mega-task.
+7.2 **Write tasks** – For each leaf node, ensure the file path is
+    `project/tasks/todo/T<ID>.md`; create the directory if missing.
+7.3 Strip wall-clock fields from meta before write.
 
 8. **Internal debate** – if `epicCount > 20` *or* graph depth > 3, prompt:
 
@@ -59,7 +65,7 @@ ask user to run the Secrets Wizard; otherwise mark task failed.
 C. **Archive & status** – on green CI:
 
 ```bash
-mv project/tasks/in_progress/T<ID>.md  project/tasks/done/$(date +%Y-Q%q)/
+mv project/tasks/in_progress/T<ID>.md  project/tasks/done/
 ```
 
 Update `project_status.md`.
